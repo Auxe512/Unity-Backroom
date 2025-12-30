@@ -1,182 +1,116 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class MazeGenerator : MonoBehaviour
 {
-    
-    [Range(5, 500)]
-    public int mazeWidth = 5, mazeHeight = 5;
-    public int startX, startY;
-    MazeCell[,] maze;
+    // 起點設在底部外環的中間
+    public int startX = 10, startY = 1;
 
-    Vector2Int currentCell;
+    // --- 極簡版地圖 (21x21) ---
+    // 1 = 牆壁, 0 = 路
+    // 這個地圖非常單純，只有 "外環" + "大十字" + "四個方塊區"
+    string[] mapLayout = new string[]
+    {
+        "111111111111111111111", // [20] 頂部邊界 (封死)
+        "100000000010000000001", // [19] 北部外環 (全通)
+        "101111111010111111101", // [18] 牆壁
+        "101000001010100000101", // [17] 
+        "101011101010101110101", // [16] 左上 & 右上 的方形房間
+        "101011101010101110101", // [15]
+        "101000000000000000101", // [14] 寬敞通道
+        "101111101000101111101", // [13] 
+        "100000000010000000001", // [12] 接近中心
+        "111111101101101111111", // [11] ★ 中央區 (只有左右通)
+        "100000000010000000001", // [10] 接近中心
+        "101111101000101111101", // [09] 
+        "101000000000000000101", // [08] 寬敞通道
+        "101011101010101110101", // [07] 
+        "101011101010101110101", // [06] 左下 & 右下 的方形房間
+        "101000001010100000101", // [05] 
+        "101111111010111111101", // [04] 牆壁
+        "100000000010000000001", // [03] 入口分流
+        "101111101111101111101", // [02] 底部屏風牆
+        "100000000010000000001", // [01] 底部外環 (全通，起點在這)
+        "111111111111111111111"  // [00] 底部邊界 (封死)
+    };
+
+    public int mazeWidth
+    {
+        get
+        {
+            if (mapLayout == null || mapLayout.Length == 0) return 0;
+            return mapLayout[0].Length;
+        }
+    }
+
+    public int mazeHeight
+    {
+        get
+        {
+            if (mapLayout == null) return 0;
+            return mapLayout.Length;
+        }
+    }
+
+    MazeCell[,] maze;
 
     public MazeCell[,] GetMaze()
     {
-        maze = new MazeCell[mazeWidth, mazeHeight];
+        int height = mazeHeight;
+        int width = mazeWidth;
 
-        for(int x = 0; x < mazeWidth; x++)
+        maze = new MazeCell[width, height];
+
+        // 1. 初始化
+        for (int x = 0; x < width; x++)
         {
-            for(int y = 0; y < mazeHeight; y++)
+            for (int y = 0; y < height; y++)
             {
                 maze[x, y] = new MazeCell(x, y);
-            } 
+                // 預設全部通暢，只有遇到 '1' 才加牆
+                maze[x, y].topWall = false;
+                maze[x, y].leftWall = false;
+            }
         }
 
-        CarvePath(startX, startY);
+        // 2. 讀取地圖
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                // 倒序讀取
+                char cellType = mapLayout[height - 1 - y][x];
+
+                if (cellType == '1')
+                {
+                    maze[x, y].topWall = true;
+                    maze[x, y].leftWall = true;
+                }
+            }
+        }
 
         return maze;
     }
-
-    List<Direction> directions = new List<Direction> {
-        Direction.Up, Direction.Down, Direction.Left, Direction.Right,
-    };
-
-    List<Direction> GetRandomDirections()
-    {
-        List<Direction> dir = new List<Direction>(directions);
-
-        List<Direction> rndDir = new List<Direction>(); 
-
-        while(dir.Count > 0)
-        {
-            int rnd = Random.Range(0, dir.Count);
-            rndDir.Add(dir[rnd]);
-            dir.RemoveAt(rnd);
-        }
-
-        return rndDir;
-    }
-
-    bool IsCellValid(int x, int y)
-    {
-        if (x < 0 || y < 0 || x > mazeWidth - 1 || y > mazeHeight - 1 || maze[x, y].visited) return false;
-        else return true;
-    }
-
-    Vector2Int CheckNeighbor()
-    {
-        List<Direction> rndDir = GetRandomDirections();
-
-        for(int i = 0; i < rndDir.Count; i++)
-        {
-            Vector2Int neighbor = currentCell;
-
-            switch (rndDir[i])
-            {
-                case Direction.Up:
-                    neighbor.y++;
-                    break;
-                case Direction.Down:
-                    neighbor.y--;
-                    break;
-                case Direction.Right:
-                    neighbor.x++;
-                    break;
-                case Direction.Left:
-                    neighbor.x--;
-                    break;
-            }
-            if (IsCellValid(neighbor.x, neighbor.y)) return neighbor;
-
-        }
-        return currentCell; 
-    }
-    void BreakWalls(Vector2Int primaryCell, Vector2Int secondaryCell)
-    {
-        if(primaryCell.x > secondaryCell.x)
-        {
-            maze[primaryCell.x, primaryCell.y].leftWall = false;
-        }
-        else if (primaryCell.x < secondaryCell.x)
-        {
-            maze[secondaryCell.x, secondaryCell.y].leftWall = false; 
-        }
-        else if (primaryCell.y < secondaryCell.y)
-        {
-            maze[primaryCell.x, secondaryCell.y].topWall = false; 
-        }
-        else if (primaryCell.y > secondaryCell.y)
-        {
-            maze[secondaryCell.x, secondaryCell.y].topWall = false;
-        }
-    }
-    void CarvePath (int x, int y)
-    {
-        if(x < 0 || y < 0 || x > mazeWidth - 1 || y > mazeHeight - 1)
-        {
-            x = y = 0;
-            Debug.LogWarning("Error");
-        }
-
-        currentCell = new Vector2Int(x, y);
-        maze[x, y].visited = true;
-
-        List<Vector2Int> path = new List<Vector2Int>();
-
-        bool deadEnd = false;
-        while (!deadEnd)
-        {
-            Vector2Int nextCell = CheckNeighbor();
-
-            if(nextCell == currentCell)
-            {
-                for (int i = path.Count - 1; i >= 0; i--)
-                {
-                    currentCell = path[i];
-                    path.RemoveAt(i);
-                    nextCell = CheckNeighbor();
-
-                    if (nextCell != currentCell) break;
-                }
-
-                if (nextCell == currentCell)
-                    deadEnd = true;
-            }
-            else
-            {
-                BreakWalls(currentCell, nextCell);
-                currentCell = nextCell;
-                maze[currentCell.x, currentCell.y].visited = true;
-                path.Add(currentCell);
-            }
-        }
-    }
 }
 
-
-public enum Direction
-{
-    Up, 
-    Down,
-    Left,
-    Right
-}
+// 基礎類別定義 (必須保留)
+public enum Direction { Up, Down, Left, Right }
 
 public class MazeCell
 {
     public bool visited;
     public int x, y;
-
     public bool topWall;
     public bool leftWall;
 
-    public Vector2Int position
-    {
-        get
-        {
-            return new Vector2Int(x, y);
-        }
-    }
+    public Vector2Int position { get { return new Vector2Int(x, y); } }
 
-    public MazeCell (int x, int y)
+    public MazeCell(int x, int y)
     {
         this.x = x;
         this.y = y;
-
         visited = false;
-
-        topWall = leftWall = true;
+        topWall = leftWall = false;
     }
 }
