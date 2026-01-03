@@ -3,13 +3,13 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerController : MonoBehaviour
 {
-    [Header("²¾°Ê³]©w")]
+    [Header("ç§»å‹•è¨­å®š")]
     public float moveSpeed = 5f;
-    [Tooltip("·Æ¹«ÆF±Ó«×")]
+    [Tooltip("æ»‘é¼ éˆæ•åº¦")]
     public float mouseSensitivity = 2f;
 
-    [Header("¥²­n¤¸¥ó")]
-    public Camera playerCamera; // °O±o¦b Inspector §âÄá¼v¾÷©ì¶i¨Ó
+    [Header("å¿…è¦å…ƒä»¶")]
+    public Camera playerCamera; // è¨˜å¾—åœ¨ Inspector æŠŠæ”å½±æ©Ÿæ‹–é€²ä¾†
 
     private Rigidbody rb;
     private float xRotation = 0f;
@@ -19,30 +19,30 @@ public class PlayerController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
 
-        // Âê©w¨ÃÁôÂÃ·Æ¹«´å¼Ğ («ö Esc ¥i¥H¸õ¥X)
+        // é–å®šä¸¦éš±è—æ»‘é¼ æ¸¸æ¨™ (æŒ‰ Esc å¯ä»¥è·³å‡º)
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        // ½T«O­èÅé¤£·|¦]¬°ª«²z¸I¼²¦ÓÂ½­Ë
+        // ç¢ºä¿å‰›é«”ä¸æœƒå› ç‚ºç‰©ç†ç¢°æ’è€Œç¿»å€’
         rb.freezeRotation = true;
     }
 
     void Update()
     {
-        // 1. ³B²zµø¨¤±ÛÂà (¨C¤@´V³£°õ¦æ¡A«OÃÒ¬yºZ)
+        // 1. è™•ç†è¦–è§’æ—‹è½‰ (æ¯ä¸€å¹€éƒ½åŸ·è¡Œï¼Œä¿è­‰æµæš¢)
         HandleMouseLook();
 
-        // 2. ±µ¦¬Áä½L¿é¤J
-        float x = Input.GetAxisRaw("Horizontal"); // A, D Áä
-        float z = Input.GetAxisRaw("Vertical");   // W, S Áä
+        // 2. æ¥æ”¶éµç›¤è¼¸å…¥
+        float x = Input.GetAxisRaw("Horizontal"); // A, D éµ
+        float z = Input.GetAxisRaw("Vertical");   // W, S éµ
 
-        // ­pºâ²¾°Ê¤è¦V (Á`¬O¬Û¹ï©óª±®aªº­±¦V)
+        // è¨ˆç®—ç§»å‹•æ–¹å‘ (ç¸½æ˜¯ç›¸å°æ–¼ç©å®¶çš„é¢å‘)
         moveDirection = (transform.right * x + transform.forward * z).normalized;
     }
 
     void FixedUpdate()
     {
-        // 3. ³B²zª«²z²¾°Ê (¦b©T©wªºª«²z®É¶¡°õ¦æ)
+        // 3. è™•ç†ç‰©ç†ç§»å‹• (åœ¨å›ºå®šçš„ç‰©ç†æ™‚é–“åŸ·è¡Œ)
         MovePlayer();
     }
 
@@ -54,18 +54,18 @@ public class PlayerController : MonoBehaviour
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * 100f * Time.deltaTime;
 
         xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, -90f, 90f); // ­­¨î©ïÀY§CÀY¨¤«× (-90«×¨ì90«×)
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f); // é™åˆ¶æŠ¬é ­ä½é ­è§’åº¦ (-90åº¦åˆ°90åº¦)
 
-        // ±ÛÂàÄá¼v¾÷ (¤W¤U¬İ)
+        // æ—‹è½‰æ”å½±æ©Ÿ (ä¸Šä¸‹çœ‹)
         playerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
 
-        // ±ÛÂàª±®a¨­Åé (¥ª¥k¬İ)
+        // æ—‹è½‰ç©å®¶èº«é«” (å·¦å³çœ‹)
         transform.Rotate(Vector3.up * mouseX);
     }
 
     void MovePlayer()
     {
-        // ¨Ï¥Î Rigidbody ²¾°Ê¦ì¸m¡A¤ñ transform.Translate §ó¾A¦Xª«²z¸I¼²
+        // ä½¿ç”¨ Rigidbody ç§»å‹•ä½ç½®ï¼Œæ¯” transform.Translate æ›´é©åˆç‰©ç†ç¢°æ’
         Vector3 targetPosition = rb.position + moveDirection * moveSpeed * Time.fixedDeltaTime;
         rb.MovePosition(targetPosition);
     }
