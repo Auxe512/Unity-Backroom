@@ -35,6 +35,13 @@ public class MazeGenerator : MonoBehaviour
     [SerializeField]
     private int _ghostCount = 4; // 要生成幾隻鬼
 
+    [Header("Bean 設定")]
+    [SerializeField]
+    private GameObject _beanPrefab;
+
+    [SerializeField]
+    private float _beanHeight = 0.3f; // 豆子離地高度
+
     private MazeCell[,] _mazeGrid;
 
     void Start()
@@ -64,6 +71,9 @@ public class MazeGenerator : MonoBehaviour
 
         // 3. 後期處理：隨機打通牆壁，讓空間更空曠
         RemoveExtraWalls();
+
+        // 3.5 生成bean
+        SpawnBeans();
 
         // 4. 烘焙導航網格 (讓鬼知道路)
         if (_navSurface != null)
@@ -220,6 +230,32 @@ public class MazeGenerator : MonoBehaviour
             Vector3 spawnPos = new Vector3(x, 0.5f, z);
 
             Instantiate(_ghostPrefab, spawnPos, Quaternion.identity);
+        }
+    }
+
+    // 3.5 生成豆子
+    private void SpawnBeans()
+    {
+        if (_beanPrefab == null)
+        {
+            Debug.LogWarning("尚未指派 Bean Prefab");
+            return;
+        }
+
+        for (int x = 0; x < _mazeWidth; x++)
+        {
+            for (int z = 0; z < _mazeDepth; z++)
+            {
+                MazeCell cell = _mazeGrid[x, z];
+
+                // 可選：避免在起點附近放豆子
+                if (x < 2 && z < 2) continue;
+
+                // 直接放在格子中心
+                Vector3 beanPos = cell.transform.position + Vector3.up * _beanHeight;
+
+                Instantiate(_beanPrefab, beanPos, Quaternion.identity, transform);
+            }
         }
     }
 }
