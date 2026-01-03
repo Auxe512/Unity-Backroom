@@ -1,116 +1,151 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class MazeGenerator : MonoBehaviour
 {
-    // 起點設在底部外環的中間
-    public int startX = 10, startY = 1;
+    [SerializeField]
+    private MazeCell _mazeCellPrefab;
 
-    // --- 極簡版地圖 (21x21) ---
-    // 1 = 牆壁, 0 = 路
-    // 這個地圖非常單純，只有 "外環" + "大十字" + "四個方塊區"
-    string[] mapLayout = new string[]
-    {
-        "111111111111111111111", // [20] 頂部邊界 (封死)
-        "100000000010000000001", // [19] 北部外環 (全通)
-        "101111111010111111101", // [18] 牆壁
-        "101000001010100000101", // [17] 
-        "101011101010101110101", // [16] 左上 & 右上 的方形房間
-        "101011101010101110101", // [15]
-        "101000000000000000101", // [14] 寬敞通道
-        "101111101000101111101", // [13] 
-        "100000000010000000001", // [12] 接近中心
-        "111111101101101111111", // [11] ★ 中央區 (只有左右通)
-        "100000000010000000001", // [10] 接近中心
-        "101111101000101111101", // [09] 
-        "101000000000000000101", // [08] 寬敞通道
-        "101011101010101110101", // [07] 
-        "101011101010101110101", // [06] 左下 & 右下 的方形房間
-        "101000001010100000101", // [05] 
-        "101111111010111111101", // [04] 牆壁
-        "100000000010000000001", // [03] 入口分流
-        "101111101111101111101", // [02] 底部屏風牆
-        "100000000010000000001", // [01] 底部外環 (全通，起點在這)
-        "111111111111111111111"  // [00] 底部邊界 (封死)
-    };
+    [SerializeField]
+    private int _mazeWidth;
 
-    public int mazeWidth
+    [SerializeField]
+    private int _mazeDepth;
+
+    private MazeCell[,] _mazeGrid; 
+
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    void Start()
     {
-        get
+        _mazeGrid = new MazeCell[_mazeWidth, _mazeDepth];
+
+        for (int x = 0; x < _mazeWidth; x++)
         {
-            if (mapLayout == null || mapLayout.Length == 0) return 0;
-            return mapLayout[0].Length;
-        }
-    }
-
-    public int mazeHeight
-    {
-        get
-        {
-            if (mapLayout == null) return 0;
-            return mapLayout.Length;
-        }
-    }
-
-    MazeCell[,] maze;
-
-    public MazeCell[,] GetMaze()
-    {
-        int height = mazeHeight;
-        int width = mazeWidth;
-
-        maze = new MazeCell[width, height];
-
-        // 1. 初始化
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
+            for (int z = 0; z < _mazeDepth; z++)
             {
-                maze[x, y] = new MazeCell(x, y);
-                // 預設全部通暢，只有遇到 '1' 才加牆
-                maze[x, y].topWall = false;
-                maze[x, y].leftWall = false;
+                _mazeGrid[x, z] = Instantiate(_mazeCellPrefab, new Vector3(x, 0, z), Quaternion.identity);
             }
         }
 
-        // 2. 讀取地圖
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-            {
-                // 倒序讀取
-                char cellType = mapLayout[height - 1 - y][x];
+        GenerateMaze(null, _mazeGrid[0, 0]); 
+    }
 
-                if (cellType == '1')
-                {
-                    maze[x, y].topWall = true;
-                    maze[x, y].leftWall = true;
-                }
+    private void GenerateMaze(MazeCell previousCell, MazeCell currentCell)
+    {
+        currentCell.Visit();
+        ClearWalls(previousCell, currentCell);
+
+        MazeCell nextCell;
+
+        do
+        { 
+            nextCell = GetNextUnvisitedCell(currentCell);
+
+            if (nextCell != null)
+            {
+                GenerateMaze(currentCell, nextCell);
+            }
+        } while (nextCell != null);
+
+        
+    }
+
+    private MazeCell GetNextUnvisitedCell(MazeCell currentCell)
+    {
+        var unvisitedCells = GetUnvisitedCells(currentCell);
+
+        return unvisitedCells.OrderBy(_ => Random.Range(1, 10)).FirstOrDefault();
+
+    }
+
+    private IEnumerable<MazeCell> GetUnvisitedCells(MazeCell currentCell)
+    {
+        int x = (int)currentCell.transform.position.x;
+        int z = (int)currentCell.transform.position.z;
+
+        if (x + 1 < _mazeWidth)
+        {
+            var cellToRight = _mazeGrid[x + 1, z];
+
+            if (cellToRight.IsVisited == false)
+            {
+                yield return cellToRight;
             }
         }
 
-        return maze;
+        if (x - 1 >= 0)
+        {
+            var cellToLeft = _mazeGrid[x - 1, z];
+
+            if (cellToLeft.IsVisited == false)
+            {
+                yield return cellToLeft;
+            }
+        }
+
+        if (z + 1 < _mazeDepth)
+        {
+            var cellToFront = _mazeGrid[x, z + 1];
+
+            if (cellToFront.IsVisited == false)
+            {
+                yield return cellToFront;
+            }
+        }
+
+        if (z - 1 >= 0)
+        {
+            var cellToBack = _mazeGrid[x, z - 1];
+
+            if (cellToBack.IsVisited == false)
+            {
+                yield return cellToBack;
+            }
+        }
     }
-}
 
-// 基礎類別定義 (必須保留)
-public enum Direction { Up, Down, Left, Right }
 
-public class MazeCell
-{
-    public bool visited;
-    public int x, y;
-    public bool topWall;
-    public bool leftWall;
-
-    public Vector2Int position { get { return new Vector2Int(x, y); } }
-
-    public MazeCell(int x, int y)
+    private void ClearWalls(MazeCell previousCell, MazeCell currentCell)
     {
-        this.x = x;
-        this.y = y;
-        visited = false;
-        topWall = leftWall = false;
+        if (previousCell == null)
+        {
+            return;
+        }
+
+        if (previousCell.transform.position.x < currentCell.transform.position.x)
+        {
+            previousCell.ClearRightWall();
+            currentCell.ClearLeftWall();
+            return;
+        } 
+
+        if (previousCell.transform.position.x > currentCell.transform.position.x)
+        {
+            previousCell.ClearLeftWall();
+            currentCell.ClearRightWall();
+            return;
+        }
+
+        if (previousCell.transform.position.z < currentCell.transform.position.z)
+        {
+            previousCell.ClearFrontWall();
+            currentCell.ClearBackWall();
+            return;
+        }
+
+        if (previousCell.transform.position.z > currentCell.transform.position.z)
+        {
+            previousCell.ClearBackWall();
+            currentCell.ClearFrontWall();
+            return;
+        }
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        
     }
 }
