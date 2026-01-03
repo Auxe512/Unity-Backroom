@@ -1,4 +1,4 @@
-using UnityEngine;
+using UnityEngine; // 這一行就是解決 Vector3 找不到的關鍵
 
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerController : MonoBehaviour
@@ -36,7 +36,7 @@ public class PlayerController : MonoBehaviour
         float x = Input.GetAxisRaw("Horizontal");
         float z = Input.GetAxisRaw("Vertical");
 
-        // 計算移動方向 (總是相對於玩家的面向)
+        // 計算移動方向
         moveDirection = (transform.right * x + transform.forward * z).normalized;
     }
 
@@ -60,21 +60,20 @@ public class PlayerController : MonoBehaviour
         transform.Rotate(Vector3.up * mouseX);
     }
 
-    // 這就是剛剛修改過的新移動函式
     void MovePlayer()
     {
-        // 取得當前垂直速度 (保留重力)
-        // 注意：如果是 Unity 6，建議用 rb.linearVelocity；舊版用 rb.velocity
-        // 這裡為了保險起見，先寫 rb.velocity (舊版相容寫法)
+        // 針對 Unity 6 的寫法：使用 linearVelocity 取代舊的 velocity
+
+        // 1. 取得當前垂直速度 (保留重力)
         float currentY = rb.linearVelocity.y;
 
-        // 計算新的水平速度
+        // 2. 計算新的水平速度
         Vector3 targetVelocity = moveDirection * moveSpeed;
 
-        // 把重力加回去
+        // 3. 把重力加回去
         targetVelocity.y = currentY;
 
-        // 套用速度
+        // 4. 套用速度
         rb.linearVelocity = targetVelocity;
     }
 }
