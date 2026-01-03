@@ -441,7 +441,7 @@ MonoBehaviour:
   _mazeWidth: 20
   _mazeDepth: 20
   _straightPathChance: 0.8
-  _extraWallRemovalChance: 0.3
+  _extraWallRemovalChance: 0.4
   _navSurface: {fileID: 2095448172}
   _ghostPrefab: {fileID: 7480307178994887481, guid: d7136b247947c8d42a7c0aa9af7090fa, type: 3}
   _ghostCount: 4
@@ -488,7 +488,7 @@ MonoBehaviour:
   m_OverrideTileSize: 0
   m_TileSize: 256
   m_OverrideVoxelSize: 0
-  m_VoxelSize: 0.06666667
+  m_VoxelSize: 0.16666667
   m_MinRegionArea: 2
   m_NavMeshData: {fileID: 0}
   m_BuildHeightMesh: 0
@@ -578,6 +578,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4435258784379535460, guid: ed12606842e00c34d96cc9db7df486a2, type: 3}
       propertyPath: m_Name
+      value: Player
+      objectReference: {fileID: 0}
+    - target: {fileID: 4435258784379535460, guid: ed12606842e00c34d96cc9db7df486a2, type: 3}
+      propertyPath: m_TagString
       value: Player
       objectReference: {fileID: 0}
     - target: {fileID: 5754549529723432277, guid: ed12606842e00c34d96cc9db7df486a2, type: 3}
