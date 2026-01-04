@@ -81,7 +81,7 @@ public class LifeSystem : MonoBehaviour
     {
         Debug.Log("遊戲結束！重新開始...");
         string currentSceneName = SceneManager.GetActiveScene().name;
-        SceneManager.LoadScene(currentSceneName);
+        SceneManager.LoadScene("UI Scene");
     }
 
     IEnumerator InvincibilityCoroutine()
