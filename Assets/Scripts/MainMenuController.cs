@@ -7,7 +7,11 @@ public class MainMenuController : MonoBehaviour
     public void StartGame()
     {
         // "SampleScene" 請改成你真正的遊戲場景名稱 (一定要跟 Build Settings 裡的名字一樣)
+<<<<<<< Updated upstream
         SceneManager.LoadScene("SampleScene");
+=======
+        SceneManager.LoadScene("GameScene");
+>>>>>>> Stashed changes
     }
 
     // === 按鈕功能：離開遊戲 ===
