@@ -1,182 +1,317 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
+using UnityEngine.AI;
+using Unity.AI.Navigation;
 
 public class MazeGenerator : MonoBehaviour
 {
-    
-    [Range(5, 500)]
-    public int mazeWidth = 5, mazeHeight = 5;
-    public int startX, startY;
-    MazeCell[,] maze;
+    [Header("基礎設定")]
+    [SerializeField]
+    private MazeCell _mazeCellPrefab; // 迷宮格子的 Prefab
 
-    Vector2Int currentCell;
+    [SerializeField]
+    private int _mazeWidth = 20;
 
-    public MazeCell[,] GetMaze()
+    [SerializeField]
+    private int _mazeDepth = 20;
+
+    [Header("迷宮風格設定")]
+    [SerializeField, Range(0f, 1f)]
+    private float _straightPathChance = 0.8f;
+
+    [SerializeField, Range(0f, 1f)]
+    private float _extraWallRemovalChance = 0.3f;
+
+    [Header("天花板與燈光設定 (Backrooms)")]
+    [SerializeField]
+    private GameObject _ceilingPlainPrefab; // 普通天花板 (無燈)
+
+    [SerializeField]
+    private GameObject _ceilingLightPrefab; // 燈光天花板 (有燈)
+
+    [SerializeField, Range(0f, 1f)]
+    private float _lightSpawnChance = 0.05f;
+
+    [Header("收集物設定")]
+    [SerializeField]
+    private GameObject _pelletPrefab; // 普通豆子 Prefab
+
+    // --- 【修改】新增大力丸設定 ---
+    [SerializeField]
+    private GameObject _powerPelletPrefab; // 大力丸 Prefab
+
+    [SerializeField, Range(0f, 1f)]
+    private float _powerPelletChance = 0.05f; // 5% 機率變成大力丸
+    // -------------------------
+
+    [SerializeField, Range(0f, 1f)]
+    private float _pelletSpawnChance = 0.5f;
+
+    [Header("AI 與 生成設定")]
+    [SerializeField]
+    private NavMeshSurface _navSurface;
+
+    [SerializeField]
+    private GameObject _ghostPrefab;
+
+    [SerializeField]
+    private int _ghostCount = 4;
+
+    [SerializeField]
+    private GameObject _playerPrefab; // 拖入玩家 Prefab
+
+    private MazeCell[,] _mazeGrid;
+
+    void Start()
     {
-        maze = new MazeCell[mazeWidth, mazeHeight];
-
-        for(int x = 0; x < mazeWidth; x++)
+        // 0. 清除舊場景物件
+        foreach (Transform child in transform)
         {
-            for(int y = 0; y < mazeHeight; y++)
-            {
-                maze[x, y] = new MazeCell(x, y);
-            } 
+            Destroy(child.gameObject);
         }
 
-        CarvePath(startX, startY);
+        // 1. 初始化網格
+        _mazeGrid = new MazeCell[_mazeWidth, _mazeDepth];
 
-        return maze;
-    }
-
-    List<Direction> directions = new List<Direction> {
-        Direction.Up, Direction.Down, Direction.Left, Direction.Right,
-    };
-
-    List<Direction> GetRandomDirections()
-    {
-        List<Direction> dir = new List<Direction>(directions);
-
-        List<Direction> rndDir = new List<Direction>(); 
-
-        while(dir.Count > 0)
+        for (int x = 0; x < _mazeWidth; x++)
         {
-            int rnd = Random.Range(0, dir.Count);
-            rndDir.Add(dir[rnd]);
-            dir.RemoveAt(rnd);
-        }
-
-        return rndDir;
-    }
-
-    bool IsCellValid(int x, int y)
-    {
-        if (x < 0 || y < 0 || x > mazeWidth - 1 || y > mazeHeight - 1 || maze[x, y].visited) return false;
-        else return true;
-    }
-
-    Vector2Int CheckNeighbor()
-    {
-        List<Direction> rndDir = GetRandomDirections();
-
-        for(int i = 0; i < rndDir.Count; i++)
-        {
-            Vector2Int neighbor = currentCell;
-
-            switch (rndDir[i])
+            for (int z = 0; z < _mazeDepth; z++)
             {
-                case Direction.Up:
-                    neighbor.y++;
-                    break;
-                case Direction.Down:
-                    neighbor.y--;
-                    break;
-                case Direction.Right:
-                    neighbor.x++;
-                    break;
-                case Direction.Left:
-                    neighbor.x--;
-                    break;
+                Vector3 cellPos = new Vector3(x, 0, z);
+
+                // 生成地板與牆壁
+                var cell = Instantiate(_mazeCellPrefab, cellPos, Quaternion.identity);
+                cell.transform.parent = transform;
+                _mazeGrid[x, z] = cell;
+
+                // 生成天花板
+                SpawnCeiling(cell);
             }
-            if (IsCellValid(neighbor.x, neighbor.y)) return neighbor;
-
         }
-        return currentCell; 
+
+        // 2. 生成迷宮路徑
+        GenerateMaze(null, _mazeGrid[0, 0]);
+
+        // 3. 打通額外牆壁
+        RemoveExtraWalls();
+
+        // 4. 生成豆子 (包含大力丸邏輯)
+        SpawnPellets();
+
+        // 5. 烘焙 NavMesh
+        if (_navSurface != null)
+        {
+            Physics.SyncTransforms();
+            _navSurface.BuildNavMesh();
+        }
+
+        // 6. 生成鬼怪
+        SpawnGhosts();
+        /*
+        // 7. 生成玩家 (解除註解)
+        SpawnPlayer();
+        */
     }
-    void BreakWalls(Vector2Int primaryCell, Vector2Int secondaryCell)
+
+    // --- 天花板生成邏輯 ---
+    private void SpawnCeiling(MazeCell parentCell)
     {
-        if(primaryCell.x > secondaryCell.x)
+        if (_ceilingPlainPrefab == null || _ceilingLightPrefab == null) return;
+
+        GameObject prefabToUse = _ceilingPlainPrefab;
+        if (Random.value < _lightSpawnChance)
         {
-            maze[primaryCell.x, primaryCell.y].leftWall = false;
+            prefabToUse = _ceilingLightPrefab;
         }
-        else if (primaryCell.x < secondaryCell.x)
-        {
-            maze[secondaryCell.x, secondaryCell.y].leftWall = false; 
-        }
-        else if (primaryCell.y < secondaryCell.y)
-        {
-            maze[primaryCell.x, secondaryCell.y].topWall = false; 
-        }
-        else if (primaryCell.y > secondaryCell.y)
-        {
-            maze[secondaryCell.x, secondaryCell.y].topWall = false;
-        }
+
+        float ceilingHeight = 1.53f;
+        Vector3 spawnPos = parentCell.transform.position + Vector3.up * ceilingHeight;
+        
+        // 轉 -90 度讓 Quad 面朝下
+        GameObject ceiling = Instantiate(prefabToUse, spawnPos, Quaternion.Euler(-90f, 0f, 0f));
+        ceiling.transform.parent = parentCell.transform;
     }
-    void CarvePath (int x, int y)
+
+    // --- 迷宮演算法 (DFS) ---
+    private void GenerateMaze(MazeCell previousCell, MazeCell currentCell)
     {
-        if(x < 0 || y < 0 || x > mazeWidth - 1 || y > mazeHeight - 1)
+        currentCell.Visit();
+        ClearWalls(previousCell, currentCell);
+
+        MazeCell nextCell;
+        do
         {
-            x = y = 0;
-            Debug.LogWarning("Error");
+            nextCell = GetNextUnvisitedCell(currentCell, previousCell);
+            if (nextCell != null) GenerateMaze(currentCell, nextCell);
+        } while (nextCell != null);
+    }
+
+    private MazeCell GetNextUnvisitedCell(MazeCell currentCell, MazeCell previousCell)
+    {
+        var unvisitedCells = GetUnvisitedCells(currentCell).ToList();
+        if (unvisitedCells.Count == 0) return null;
+
+        if (previousCell != null && Random.value < _straightPathChance)
+        {
+            int xDir = (int)(currentCell.transform.position.x - previousCell.transform.position.x);
+            int zDir = (int)(currentCell.transform.position.z - previousCell.transform.position.z);
+
+            var forwardCell = unvisitedCells.FirstOrDefault(cell =>
+                (int)(cell.transform.position.x - currentCell.transform.position.x) == xDir &&
+                (int)(cell.transform.position.z - currentCell.transform.position.z) == zDir
+            );
+
+            if (forwardCell != null) return forwardCell;
         }
+        return unvisitedCells.OrderBy(_ => Random.Range(1, 10)).FirstOrDefault();
+    }
 
-        currentCell = new Vector2Int(x, y);
-        maze[x, y].visited = true;
-
-        List<Vector2Int> path = new List<Vector2Int>();
-
-        bool deadEnd = false;
-        while (!deadEnd)
+    private void RemoveExtraWalls()
+    {
+        for (int x = 0; x < _mazeWidth; x++)
         {
-            Vector2Int nextCell = CheckNeighbor();
-
-            if(nextCell == currentCell)
+            for (int z = 0; z < _mazeDepth; z++)
             {
-                for (int i = path.Count - 1; i >= 0; i--)
+                if (Random.value < _extraWallRemovalChance)
                 {
-                    currentCell = path[i];
-                    path.RemoveAt(i);
-                    nextCell = CheckNeighbor();
-
-                    if (nextCell != currentCell) break;
+                    var current = _mazeGrid[x, z];
+                    var neighbors = GetNeighbors(current).ToList();
+                    if (neighbors.Count > 0)
+                    {
+                        var randomNeighbor = neighbors[Random.Range(0, neighbors.Count)];
+                        ClearWalls(current, randomNeighbor);
+                    }
                 }
+            }
+        }
+    }
 
-                if (nextCell == currentCell)
-                    deadEnd = true;
+    private void ClearWalls(MazeCell previousCell, MazeCell currentCell)
+    {
+        if (previousCell == null) return;
+
+        if (previousCell.transform.position.x < currentCell.transform.position.x)
+        {
+            previousCell.ClearRightWall();
+            currentCell.ClearLeftWall();
+            return;
+        }
+        if (previousCell.transform.position.x > currentCell.transform.position.x)
+        {
+            previousCell.ClearLeftWall();
+            currentCell.ClearRightWall();
+            return;
+        }
+        if (previousCell.transform.position.z < currentCell.transform.position.z)
+        {
+            previousCell.ClearFrontWall();
+            currentCell.ClearBackWall();
+            return;
+        }
+        if (previousCell.transform.position.z > currentCell.transform.position.z)
+        {
+            previousCell.ClearBackWall();
+            currentCell.ClearFrontWall();
+            return;
+        }
+    }
+
+    private IEnumerable<MazeCell> GetNeighbors(MazeCell currentCell)
+    {
+        int x = (int)currentCell.transform.position.x;
+        int z = (int)currentCell.transform.position.z;
+        if (x + 1 < _mazeWidth) yield return _mazeGrid[x + 1, z];
+        if (x - 1 >= 0) yield return _mazeGrid[x - 1, z];
+        if (z + 1 < _mazeDepth) yield return _mazeGrid[x, z + 1];
+        if (z - 1 >= 0) yield return _mazeGrid[x, z - 1];
+    }
+
+    private IEnumerable<MazeCell> GetUnvisitedCells(MazeCell currentCell)
+    {
+        return GetNeighbors(currentCell).Where(c => c.IsVisited == false);
+    }
+
+    // --- 【修改】生成豆子與大力丸 ---
+    private void SpawnPellets()
+    {
+        if (_pelletPrefab == null) return;
+
+        int count = 0;
+        int powerCount = 0;
+
+        for (int x = 0; x < _mazeWidth; x++)
+        {
+            for (int z = 0; z < _mazeDepth; z++)
+            {
+                if (x < 3 && z < 3) continue;
+
+                if (Random.value < _pelletSpawnChance)
+                {
+                    // 預設生成普通豆子
+                    GameObject prefabToUse = _pelletPrefab;
+
+                    // 判斷是否生成大力丸
+                    if (_powerPelletPrefab != null && Random.value < _powerPelletChance)
+                    {
+                        prefabToUse = _powerPelletPrefab;
+                        powerCount++;
+                    }
+
+                    Vector3 pos = new Vector3(x, 0.15f, z);
+                    GameObject pellet = Instantiate(prefabToUse, pos, Quaternion.identity);
+                    pellet.transform.parent = transform;
+                    count++;
+                }
+            }
+        }
+        Debug.Log($"生成了 {count} 顆收集物 (包含 {powerCount} 顆大力丸)");
+    }
+
+    // --- 生成鬼怪 ---
+    private void SpawnGhosts()
+    {
+        if (_ghostPrefab == null) return;
+
+        for (int i = 0; i < _ghostCount; i++)
+        {
+            int x, z;
+            int attempts = 0;
+            do
+            {
+                x = Random.Range(5, _mazeWidth - 1);
+                z = Random.Range(5, _mazeDepth - 1);
+                attempts++;
+            } while (x < 5 && z < 5 && attempts < 100);
+
+            Vector3 randomPos = new Vector3(x, 0, z);
+            NavMeshHit hit;
+
+            if (NavMesh.SamplePosition(randomPos, out hit, 2.0f, NavMesh.AllAreas))
+            {
+                Instantiate(_ghostPrefab, hit.position, Quaternion.identity);
             }
             else
             {
-                BreakWalls(currentCell, nextCell);
-                currentCell = nextCell;
-                maze[currentCell.x, currentCell.y].visited = true;
-                path.Add(currentCell);
+                Instantiate(_ghostPrefab, new Vector3(x, 0.1f, z), Quaternion.identity);
             }
         }
     }
-}
 
-
-public enum Direction
-{
-    Up, 
-    Down,
-    Left,
-    Right
-}
-
-public class MazeCell
-{
-    public bool visited;
-    public int x, y;
-
-    public bool topWall;
-    public bool leftWall;
-
-    public Vector2Int position
+    // --- 【修改】生成玩家 (解除註解) ---
+    /*
+    private void SpawnPlayer()
     {
-        get
+        if (_playerPrefab == null)
         {
-            return new Vector2Int(x, y);
+            Debug.LogWarning("注意：MazeGenerator 尚未設定 Player Prefab，無法生成玩家。");
+            return;
         }
+
+        // 生成在 (0, 1, 0) 避免卡在地板
+        Vector3 startPos = new Vector3(0, 1.0f, 0);
+        Instantiate(_playerPrefab, startPos, Quaternion.identity);
     }
-
-    public MazeCell (int x, int y)
-    {
-        this.x = x;
-        this.y = y;
-
-        visited = false;
-
-        topWall = leftWall = true;
-    }
+    */
 }
