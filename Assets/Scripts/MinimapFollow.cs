@@ -2,19 +2,32 @@ using UnityEngine;
 
 public class MinimapFollow : MonoBehaviour
 {
-    public Transform player; // 拖入 Player 物件
+    public Transform player; // 就算這裡沒東西，程式也會自己找
 
     void LateUpdate()
     {
-        if (player == null) return;
+        // 1. 如果目前沒有鎖定玩家，就嘗試去尋找
+        if (player == null)
+        {
+            // 去場景裡找標籤是 "Player" 的物件
+            GameObject foundPlayer = GameObject.FindGameObjectWithTag("Player");
 
-        // 只更新 X 和 Z 軸 (水平位置)，Y 軸保持在高空
+            if (foundPlayer != null)
+            {
+                player = foundPlayer.transform;
+            }
+            else
+            {
+                // 如果真的找不到 (例如玩家還沒生出來)，就先不執行移動
+                return;
+            }
+        }
+
+        // 2. 找到了玩家，開始跟隨
+        // 只更新 X 和 Z 軸 (水平位置)，Y 軸保持原本攝影機的高度 (例如 20)
         Vector3 newPosition = player.position;
-        newPosition.y = transform.position.y; // 保持原本的高度 (例如 20)
+        newPosition.y = transform.position.y;
 
         transform.position = newPosition;
-
-        // 如果你希望地圖跟著玩家旋轉，把下面這行取消註解
-        // transform.rotation = Quaternion.Euler(90f, player.eulerAngles.y, 0f);
     }
 }

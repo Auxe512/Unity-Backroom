@@ -13,8 +13,8 @@ GameObject:
   - component: {fileID: 6993313601046209180}
   - component: {fileID: 1196069957170123375}
   m_Layer: 1
-  m_Name: Pellet
-  m_TagString: Pellet
+  m_Name: PowerPellet
+  m_TagString: PowerPellet
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -68,7 +68,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 3b140482ae7543d42acd75884ec1b8f7, type: 2}
+  - {fileID: 2100000, guid: 4f74f39d628a1d347ab684de97cf08f2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -178,7 +178,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: d575d5c5acda7f244ac968dacdf37b50, type: 2}
+  - {fileID: 2100000, guid: 4f74f39d628a1d347ab684de97cf08f2, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

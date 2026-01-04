@@ -24,7 +24,6 @@ public class MazeGenerator : MonoBehaviour
     [SerializeField, Range(0f, 1f)]
     private float _extraWallRemovalChance = 0.3f;
 
-    // --- 【新增】天花板與燈光設定 ---
     [Header("天花板與燈光設定 (Backrooms)")]
     [SerializeField]
     private GameObject _ceilingPlainPrefab; // 普通天花板 (無燈)
@@ -33,11 +32,19 @@ public class MazeGenerator : MonoBehaviour
     private GameObject _ceilingLightPrefab; // 燈光天花板 (有燈)
 
     [SerializeField, Range(0f, 1f)]
-    private float _lightSpawnChance = 0.05f; // 燈光機率 (建議設低一點，例如 0.05，讓場景更暗更恐怖)
+    private float _lightSpawnChance = 0.05f;
 
     [Header("收集物設定")]
     [SerializeField]
-    private GameObject _pelletPrefab; // 豆子 Prefab
+    private GameObject _pelletPrefab; // 普通豆子 Prefab
+
+    // --- 【修改】新增大力丸設定 ---
+    [SerializeField]
+    private GameObject _powerPelletPrefab; // 大力丸 Prefab
+
+    [SerializeField, Range(0f, 1f)]
+    private float _powerPelletChance = 0.05f; // 5% 機率變成大力丸
+    // -------------------------
 
     [SerializeField, Range(0f, 1f)]
     private float _pelletSpawnChance = 0.5f;
@@ -51,6 +58,9 @@ public class MazeGenerator : MonoBehaviour
 
     [SerializeField]
     private int _ghostCount = 4;
+
+    [SerializeField]
+    private GameObject _playerPrefab; // 拖入玩家 Prefab
 
     private MazeCell[,] _mazeGrid;
 
@@ -76,7 +86,7 @@ public class MazeGenerator : MonoBehaviour
                 cell.transform.parent = transform;
                 _mazeGrid[x, z] = cell;
 
-                // 【生成天花板】
+                // 生成天花板
                 SpawnCeiling(cell);
             }
         }
@@ -87,42 +97,40 @@ public class MazeGenerator : MonoBehaviour
         // 3. 打通額外牆壁
         RemoveExtraWalls();
 
-        // 4. 生成豆子
+        // 4. 生成豆子 (包含大力丸邏輯)
         SpawnPellets();
 
         // 5. 烘焙 NavMesh
         if (_navSurface != null)
         {
-            Physics.SyncTransforms(); // 強制同步位置，避免烘焙錯誤
+            Physics.SyncTransforms();
             _navSurface.BuildNavMesh();
         }
 
         // 6. 生成鬼怪
         SpawnGhosts();
+        /*
+        // 7. 生成玩家 (解除註解)
+        SpawnPlayer();
+        */
     }
 
     // --- 天花板生成邏輯 ---
-    // --- 天花板生成邏輯 (使用你測試出的完美數值) ---
     private void SpawnCeiling(MazeCell parentCell)
     {
         if (_ceilingPlainPrefab == null || _ceilingLightPrefab == null) return;
 
-        // 1. 決定用哪種天花板
         GameObject prefabToUse = _ceilingPlainPrefab;
         if (Random.value < _lightSpawnChance)
         {
             prefabToUse = _ceilingLightPrefab;
         }
 
-        // 2. 設定高度：使用你找到的 1.53
         float ceilingHeight = 1.53f;
         Vector3 spawnPos = parentCell.transform.position + Vector3.up * ceilingHeight;
-
-        // 3. 生成物件：使用你截圖中的旋轉角度 -90 度
-        // 注意：因為你是用 Quad (平面)，所以要轉 -90 度才會面朝下
+        
+        // 轉 -90 度讓 Quad 面朝下
         GameObject ceiling = Instantiate(prefabToUse, spawnPos, Quaternion.Euler(-90f, 0f, 0f));
-
-        // 4. 設定父物件
         ceiling.transform.parent = parentCell.transform;
     }
 
@@ -225,12 +233,14 @@ public class MazeGenerator : MonoBehaviour
         return GetNeighbors(currentCell).Where(c => c.IsVisited == false);
     }
 
-    // --- 生成豆子 ---
+    // --- 【修改】生成豆子與大力丸 ---
     private void SpawnPellets()
     {
         if (_pelletPrefab == null) return;
 
         int count = 0;
+        int powerCount = 0;
+
         for (int x = 0; x < _mazeWidth; x++)
         {
             for (int z = 0; z < _mazeDepth; z++)
@@ -239,18 +249,27 @@ public class MazeGenerator : MonoBehaviour
 
                 if (Random.value < _pelletSpawnChance)
                 {
-                    // 高度設為 0.15f，貼近地板
+                    // 預設生成普通豆子
+                    GameObject prefabToUse = _pelletPrefab;
+
+                    // 判斷是否生成大力丸
+                    if (_powerPelletPrefab != null && Random.value < _powerPelletChance)
+                    {
+                        prefabToUse = _powerPelletPrefab;
+                        powerCount++;
+                    }
+
                     Vector3 pos = new Vector3(x, 0.15f, z);
-                    GameObject pellet = Instantiate(_pelletPrefab, pos, Quaternion.identity);
+                    GameObject pellet = Instantiate(prefabToUse, pos, Quaternion.identity);
                     pellet.transform.parent = transform;
                     count++;
                 }
             }
         }
-        Debug.Log($"生成了 {count} 顆豆子");
+        Debug.Log($"生成了 {count} 顆收集物 (包含 {powerCount} 顆大力丸)");
     }
 
-    // --- 生成鬼怪 (修復 loop 錯誤) ---
+    // --- 生成鬼怪 ---
     private void SpawnGhosts()
     {
         if (_ghostPrefab == null) return;
@@ -259,7 +278,6 @@ public class MazeGenerator : MonoBehaviour
         {
             int x, z;
             int attempts = 0;
-            // 隨機找位置，避開起點 (0~5 區域)
             do
             {
                 x = Random.Range(5, _mazeWidth - 1);
@@ -270,7 +288,6 @@ public class MazeGenerator : MonoBehaviour
             Vector3 randomPos = new Vector3(x, 0, z);
             NavMeshHit hit;
 
-            // 確保生在 NavMesh 上
             if (NavMesh.SamplePosition(randomPos, out hit, 2.0f, NavMesh.AllAreas))
             {
                 Instantiate(_ghostPrefab, hit.position, Quaternion.identity);
@@ -281,4 +298,20 @@ public class MazeGenerator : MonoBehaviour
             }
         }
     }
+
+    // --- 【修改】生成玩家 (解除註解) ---
+    /*
+    private void SpawnPlayer()
+    {
+        if (_playerPrefab == null)
+        {
+            Debug.LogWarning("注意：MazeGenerator 尚未設定 Player Prefab，無法生成玩家。");
+            return;
+        }
+
+        // 生成在 (0, 1, 0) 避免卡在地板
+        Vector3 startPos = new Vector3(0, 1.0f, 0);
+        Instantiate(_playerPrefab, startPos, Quaternion.identity);
+    }
+    */
 }

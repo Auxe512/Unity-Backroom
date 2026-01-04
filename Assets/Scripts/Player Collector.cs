@@ -1,62 +1,103 @@
 using UnityEngine;
-using UnityEngine.UI; // 如果之後要做 UI 顯示分數需要這個
+using System.Collections; // 為了使用協程 (Coroutine)
 
 public class PlayerCollector : MonoBehaviour
 {
     [Header("收集進度")]
     public int currentPellets = 0;
-    public int targetPellets = 30; // 企劃書設定的目標
+    public int targetPellets = 30;
 
-    [Header("音效 (選填)")]
-    public AudioClip eatSound; // 吃豆子的聲音
+    [Header("一般豆子音效")]
+    public AudioClip eatSound;
+
+    [Header("大力丸設定")]
+    [Tooltip("透視鬼魂的時間 (秒)")]
+    public float powerDuration = 5.0f;
+    public AudioClip powerUpSound; // 吃大力丸的音效
+
     private AudioSource _audioSource;
 
     void Start()
     {
-        // 如果有掛 AudioSource 就抓取
         _audioSource = GetComponent<AudioSource>();
         if (_audioSource == null)
         {
-            // 動態新增一個，方便播放音效
             _audioSource = gameObject.AddComponent<AudioSource>();
         }
     }
 
-    // 當玩家進入 "Is Trigger" 的碰撞體時會觸發
     void OnTriggerEnter(Collider other)
     {
-        // 檢查碰到的東西是不是豆子 (依靠 Tag 判斷)
+        // 1. 吃到普通豆子
         if (other.CompareTag("Pellet"))
         {
             CollectPellet(other.gameObject);
+        }
+        // 2. 吃到大力丸 (PowerPellet)
+        else if (other.CompareTag("PowerPellet"))
+        {
+            StartCoroutine(CollectPowerPellet(other.gameObject));
         }
     }
 
     void CollectPellet(GameObject pellet)
     {
-        // 1. 增加分數
         currentPellets++;
         Debug.Log($"收集進度: {currentPellets} / {targetPellets}");
 
-        // 2. 播放音效 (如果有設定)
-        if (eatSound != null)
-        {
-            _audioSource.PlayOneShot(eatSound);
-        }
+        if (eatSound != null) _audioSource.PlayOneShot(eatSound);
 
-        // 3. 銷毀豆子物件 (代表吃掉了)
+        Destroy(pellet);
+        CheckWinCondition();
+    }
+
+    // --- 處理大力丸的協程 ---
+    IEnumerator CollectPowerPellet(GameObject pellet)
+    {
+        Debug.Log("吃到大力丸！鬼魂現形！");
+
+        // A. 播放音效
+        if (powerUpSound != null) _audioSource.PlayOneShot(powerUpSound);
+
+        // B. 銷毀大力丸 (隱藏並延遲銷毀，避免協程中斷，或是直接 Destroy 但把協程掛在別的地方)
+        // 為了簡單起見，我們先把大力丸移到遠處並關閉顯示，等時間到再銷毀，
+        // 或者直接 Destroy(pellet) 然後這段邏輯繼續跑 (因為協程是在 Player 身上跑的，沒問題)
         Destroy(pellet);
 
-        // 4. 檢查是否達成企劃書的階段轉換條件
-        CheckWinCondition();
+        // C. 開啟所有鬼魂的透視眼
+        ToggleGhostIndicators(true);
+
+        // D. 等待指定時間
+        yield return new WaitForSeconds(powerDuration);
+
+        // E. 關閉透視眼
+        ToggleGhostIndicators(false);
+        Debug.Log("大力丸失效，鬼魂隱藏...");
+    }
+
+    // 控制鬼魂頭頂標記的開關
+    void ToggleGhostIndicators(bool show)
+    {
+        // 1. 找出場景中所有 Tag 為 "Ghost" 的物件
+        GameObject[] ghosts = GameObject.FindGameObjectsWithTag("Ghost");
+
+        foreach (GameObject ghost in ghosts)
+        {
+            // --- 【修改這裡】搜尋我們剛剛改名的 "MinimapIcon" ---
+            Transform icon = ghost.transform.Find("Indicator");
+
+            if (icon != null)
+            {
+                icon.gameObject.SetActive(show);
+            }
+        }
     }
 
     void CheckWinCondition()
     {
         if (currentPellets >= targetPellets)
         {
-            Debug.Log("【達成目標】收集足夠的幼的 (Pellets)！準備進入階段二 (熄燈/傳送)...");
-            // 之後這裡會呼叫 GameManager 觸發第二階段
+            Debug.Log("【達成目標】進入下一階段！");
         }
     }
 }
