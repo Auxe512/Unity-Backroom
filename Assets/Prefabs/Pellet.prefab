@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 1468355552986602856}
   - component: {fileID: 6993313601046209180}
   - component: {fileID: 1196069957170123375}
-  - component: {fileID: 8055381106554413917}
   m_Layer: 1
   m_Name: Pellet
   m_TagString: Pellet
@@ -113,18 +112,6 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.5
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &8055381106554413917
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3099030681448775708}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d54483671785e5a469aac52de88f28c1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Rotator
 --- !u!1 &8257161111964720162
 GameObject:
   m_ObjectHideFlags: 0
