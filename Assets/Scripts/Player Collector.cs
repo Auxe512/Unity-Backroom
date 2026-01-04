@@ -1,19 +1,23 @@
-using UnityEngine;
-using System.Collections; // ¬°¤F¨Ï¥Î¨óµ{ (Coroutine)
+ï»¿using UnityEngine;
+using System.Collections;
 
 public class PlayerCollector : MonoBehaviour
 {
-    [Header("¦¬¶°¶i«×")]
+    [Header("æ”¶é›†é€²åº¦")]
     public int currentPellets = 0;
-    public int targetPellets = 30;
+    public int targetPellets = 50; //
 
-    [Header("¤@¯ë¨§¤l­µ®Ä")]
+    [Header("ä¸€èˆ¬è±†å­éŸ³æ•ˆ")]
     public AudioClip eatSound;
 
-    [Header("¤j¤O¤Y³]©w")]
-    [Tooltip("³zµø°­»îªº®É¶¡ (¬í)")]
+    [Header("å¤§åŠ›ä¸¸è¨­å®š")]
+    [Tooltip("é€è¦–é¬¼é­‚çš„æ™‚é–“ (ç§’)")]
     public float powerDuration = 5.0f;
-    public AudioClip powerUpSound; // ¦Y¤j¤O¤Yªº­µ®Ä
+    public AudioClip powerUpSound;
+
+    [Header("å‹åˆ©ç•«é¢è¨­å®š")]
+    [Tooltip("è«‹æŠŠ Canvas è£¡é¢çš„ WinPanel (å‹åˆ©åœ–ç‰‡) æ‹–é€²ä¾†")]
+    public GameObject winUI;
 
     private AudioSource _audioSource;
 
@@ -24,16 +28,17 @@ public class PlayerCollector : MonoBehaviour
         {
             _audioSource = gameObject.AddComponent<AudioSource>();
         }
+
+        // ç¢ºä¿å‹åˆ©ç•«é¢ä¸€é–‹å§‹æ˜¯é—œé–‰çš„
+        if (winUI != null) winUI.SetActive(false);
     }
 
     void OnTriggerEnter(Collider other)
     {
-        // 1. ¦Y¨ì´¶³q¨§¤l
         if (other.CompareTag("Pellet"))
         {
             CollectPellet(other.gameObject);
         }
-        // 2. ¦Y¨ì¤j¤O¤Y (PowerPellet)
         else if (other.CompareTag("PowerPellet"))
         {
             StartCoroutine(CollectPowerPellet(other.gameObject));
@@ -43,7 +48,9 @@ public class PlayerCollector : MonoBehaviour
     void CollectPellet(GameObject pellet)
     {
         currentPellets++;
-        Debug.Log($"¦¬¶°¶i«×: {currentPellets} / {targetPellets}");
+
+        // é€™è£¡å¹«ä½ åŠ å€‹ Logï¼Œè®“ä½ åœ¨ Console å¯ä»¥ç¢ºèªç›®æ¨™æ˜¯å°çš„
+        Debug.Log($"æ”¶é›†é€²åº¦: {currentPellets} / {targetPellets}");
 
         if (eatSound != null) _audioSource.PlayOneShot(eatSound);
 
@@ -51,53 +58,50 @@ public class PlayerCollector : MonoBehaviour
         CheckWinCondition();
     }
 
-    // --- ³B²z¤j¤O¤Yªº¨óµ{ ---
-    IEnumerator CollectPowerPellet(GameObject pellet)
+    // --- å‹åˆ©åˆ¤æ–·èˆ‡çµç®— ---
+    void CheckWinCondition()
     {
-        Debug.Log("¦Y¨ì¤j¤O¤Y¡I°­»î²{§Î¡I");
-
-        // A. ¼½©ñ­µ®Ä
-        if (powerUpSound != null) _audioSource.PlayOneShot(powerUpSound);
-
-        // B. ¾P·´¤j¤O¤Y (ÁôÂÃ¨Ã©µ¿ğ¾P·´¡AÁ×§K¨óµ{¤¤Â_¡A©Î¬Oª½±µ Destroy ¦ı§â¨óµ{±¾¦b§Oªº¦a¤è)
-        // ¬°¤FÂ²³æ°_¨£¡A§Ú­Ì¥ı§â¤j¤O¤Y²¾¨ì»·³B¨ÃÃö³¬Åã¥Ü¡Aµ¥®É¶¡¨ì¦A¾P·´¡A
-        // ©ÎªÌª½±µ Destroy(pellet) µM«á³o¬qÅŞ¿èÄ~Äò¶] (¦]¬°¨óµ{¬O¦b Player ¨­¤W¶]ªº¡A¨S°İÃD)
-        Destroy(pellet);
-
-        // C. ¶}±Ò©Ò¦³°­»îªº³zµø²´
-        ToggleGhostIndicators(true);
-
-        // D. µ¥«İ«ü©w®É¶¡
-        yield return new WaitForSeconds(powerDuration);
-
-        // E. Ãö³¬³zµø²´
-        ToggleGhostIndicators(false);
-        Debug.Log("¤j¤O¤Y¥¢®Ä¡A°­»îÁôÂÃ...");
-    }
-
-    // ±±¨î°­»îÀY³»¼Ğ°Oªº¶}Ãö
-    void ToggleGhostIndicators(bool show)
-    {
-        // 1. §ä¥X³õ´º¤¤©Ò¦³ Tag ¬° "Ghost" ªºª«¥ó
-        GameObject[] ghosts = GameObject.FindGameObjectsWithTag("Ghost");
-
-        foreach (GameObject ghost in ghosts)
+        // åªè¦æ”¶é›†æ•¸é‡ >= ç›®æ¨™ (50)ï¼Œå°±ç²å‹
+        if (currentPellets >= targetPellets)
         {
-            // --- ¡i­×§ï³o¸Ì¡j·j´M§Ú­Ì­è­è§ï¦Wªº "MinimapIcon" ---
-            Transform icon = ghost.transform.Find("Indicator");
-
-            if (icon != null)
-            {
-                icon.gameObject.SetActive(show);
-            }
+            Debug.Log("ã€é”æˆç›®æ¨™ã€‘æ­å–œç²å‹ï¼");
+            YouWin();
         }
     }
 
-    void CheckWinCondition()
+    void YouWin()
     {
-        if (currentPellets >= targetPellets)
+        // 1. é¡¯ç¤ºå‹åˆ©åœ–ç‰‡
+        if (winUI != null)
         {
-            Debug.Log("¡i¹F¦¨¥Ø¼Ğ¡j¶i¤J¤U¤@¶¥¬q¡I");
+            winUI.SetActive(true);
+        }
+
+        // 2. è§£é–æ»‘é¼  (è®“ä½ ä¹‹å¾Œå¯ä»¥æŒ‰ä¸‹ä¸€é—œæˆ–é‡ä¾†)
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        // 3. æš«åœéŠæˆ²æ™‚é–“
+        Time.timeScale = 0f;
+    }
+
+    // ... å¤§åŠ›ä¸¸ç›¸é—œ ...
+    IEnumerator CollectPowerPellet(GameObject pellet)
+    {
+        if (powerUpSound != null) _audioSource.PlayOneShot(powerUpSound);
+        Destroy(pellet);
+        ToggleGhostIndicators(true);
+        yield return new WaitForSeconds(powerDuration);
+        ToggleGhostIndicators(false);
+    }
+
+    void ToggleGhostIndicators(bool show)
+    {
+        GameObject[] ghosts = GameObject.FindGameObjectsWithTag("Ghost");
+        foreach (GameObject ghost in ghosts)
+        {
+            Transform icon = ghost.transform.Find("MinimapIcon");
+            if (icon != null) icon.gameObject.SetActive(show);
         }
     }
 }
